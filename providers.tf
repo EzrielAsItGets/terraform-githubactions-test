@@ -3,9 +3,9 @@ terraform {
   cloud {
     organization = "ezrielasitgets"
 
-    workspaces {
+    /*     workspaces {
       name = "ej-cicd-test"
-    }
+    } */
   }
 
   required_providers {
