@@ -1,0 +1,77 @@
+name: Terraform Apply or Destroy
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  TF_CLOUD_ORGANIZATION: "YOUR-ORGANIZATION-HERE"
+  TF_API_TOKEN: "${{ secrets.TF_API_TOKEN }}"
+  TF_WORKSPACE: "learn-terraform-github-actions"
+  CONFIG_DIRECTORY: "./"
+
+jobs:
+  terraform:
+    name: "Terraform Apply or Destroy"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set Action
+        id: set_action
+        run: |
+          if [ "${{ github.event.inputs.action }}" == "apply" ]; then
+            echo "::set-output name=action::apply"
+          elif [ "${{ github.event.inputs.action }}" == "destroy" ]; then
+            echo "::set-output name=action::destroy"
+          else
+            echo "Invalid action. Must be 'apply' or 'destroy'."
+            exit 1
+          fi
+
+      - name: Upload Configuration
+        if: steps.set_action.outputs.action == 'apply'
+        uses: hashicorp/tfc-workflows-github/actions/upload-configuration@v1.0.0
+        id: apply-upload
+        with:
+          workspace: ${{ env.TF_WORKSPACE }}
+          directory: ${{ env.CONFIG_DIRECTORY }}
+
+      - name: Create Apply Run
+        if: steps.set_action.outputs.action == 'apply'
+        uses: hashicorp/tfc-workflows-github/actions/create-run@v1.0.0
+        id: apply-run
+        with:
+          workspace: ${{ env.TF_WORKSPACE }}
+          configuration_version: ${{ steps.apply-upload.outputs.configuration_version_id }}
+
+      - name: Apply
+        if: steps.set_action.outputs.action == 'apply'
+        uses: hashicorp/tfc-workflows-github/actions/apply-run@v1.0.0
+        if: fromJSON(steps.apply-run.outputs.payload).data.attributes.actions.IsConfirmable
+        id: apply
+        with:
+          run: ${{ steps.apply-run.outputs.run_id }}
+          comment: "Apply Run from GitHub Actions CI ${{ github.sha }}"
+
+      - name: Create Destroy Run
+        if: steps.set_action.outputs.action == 'destroy'
+        uses: hashicorp/tfc-workflows-github/actions/create-run@v1.0.0
+        id: destroy-run
+        with:
+          workspace: ${{ env.TF_WORKSPACE }}
+          message: "Destroy Run from GitHub Actions CI ${{ github.sha }}"
+          targets: "destroy"
+
+      - name: Destroy
+        if: steps.set_action.outputs.action == 'destroy'
+        uses: hashicorp/tfc-workflows-github/actions/apply-run@v1.0.0
+        if: fromJSON(steps.destroy-run.outputs.payload).data.attributes.actions.IsConfirmable
+        id: destroy
+        with:
+          run: ${{ steps.destroy-run.outputs.run_id }}
+          comment: "Destroy Run from GitHub Actions CI ${{ github.sha }}"
