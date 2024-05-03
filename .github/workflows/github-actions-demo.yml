@@ -27,14 +27,15 @@ jobs:
         with:
           cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
 
+      - name: Select or Create Terraform Workspace
+        run: |
+            if ! terraform workspace select ${{ env.TF_WORKSPACE }}; then
+              terraform workspace new ${{ env.TF_WORKSPACE }}
+            fi
+
       - name: Initialize Terraform
         run: terraform init
 
-      - name: Select or Create Terraform Workspace
-        run: |
-          if ! terraform workspace select ${{ env.TF_WORKSPACE }}; then
-            terraform workspace new ${{ env.TF_WORKSPACE }}
-          fi
 
       - name: Upload Configuration
         uses: hashicorp/tfc-workflows-github/actions/upload-configuration@v1.0.0
